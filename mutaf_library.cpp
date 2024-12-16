@@ -1,9 +1,11 @@
 #include <iostream>
 #include <conio.h>
 #include <stdlib.h>
+#include <fstream> // Step 01: Include the fstream library
 
 using namespace std;
 
+// Function declarations
 int mainHeader();
 char adminMenu();
 int clearScreen();
@@ -24,28 +26,46 @@ int findStudentIndex(string username);
 int findBookIndex(string id);
 int findUserIndex(string name);
 bool containsDigit(string str);
+int loadUsers(); // Function to load users from file
+int saveUserToFile(string name, string pass, string role); // Function to save a user to file
+string getfield(string record, int field); // Function to get a specific field from a CSV record
 
 const int MAX_RECORDS = 100;
 const int MAX_BOOKS = 100;
 
+// User data arrays
 string usernameA[MAX_RECORDS];
 string passwordsA[MAX_RECORDS];
 string rolesA[MAX_RECORDS];
 int userCount = 0;
 
+// Student data arrays
 string student_name[MAX_RECORDS];
 float student_balance[MAX_RECORDS];
 string student_issuedBook[MAX_RECORDS];
 int studentCount = 0;
 
+// Book data arrays
 string bookID[MAX_BOOKS];
 string bookName[MAX_BOOKS];
 string bookAuthor[MAX_BOOKS];
 string bookStatus[MAX_BOOKS];
 int bookCount = 0;
 
+// File name for users
+const string USERS_FILE = "users.txt";
+
 int main() {
-    addUser("admin", "123", "ADMIN");
+    // Step 05: Load users from the file
+    loadUsers();
+
+    // If no users are loaded, add default admin
+    if (userCount == 0) {
+        addUser("admin", "123", "ADMIN");
+        saveUserToFile("admin", "123", "ADMIN");
+        cout << "Default admin created. Username: admin, Password: 123" << endl;
+        system("pause");
+    }
 
     while (true) {
         system("cls");
@@ -62,7 +82,8 @@ int main() {
             mainHeader();
             string loginUsername, loginPassword;
             cout << "Enter admin username: ";
-            cin >> loginUsername;
+            cin.ignore(); // To ignore the leftover newline character
+            getline(cin, loginUsername); // Use getline to allow spaces in username
             cout << "Enter password: ";
             cin >> loginPassword;
 
@@ -78,7 +99,8 @@ int main() {
                         bool validName = false;
                         while (!validName) {
                             cout << "Enter admin username: ";
-                            cin >> newUsername;
+                            cin.ignore();
+                            getline(cin, newUsername); // Use getline for names with spaces
                             if (containsDigit(newUsername)) {
                                 cout << "Admin name should not contain numbers. Try again." << endl;
                             } else {
@@ -94,8 +116,10 @@ int main() {
                             string pass;
                             cin >> pass;
 
-                            addUser(newUsername, pass, "ADMIN");
-                            cout << "Admin added successfully!" << endl;
+                            if (addUser(newUsername, pass, "ADMIN")) {
+                                saveUserToFile(newUsername, pass, "ADMIN"); // Save to file
+                                cout << "Admin added successfully!" << endl;
+                            }
                         }
                         clearScreen();
 
@@ -141,7 +165,8 @@ int main() {
             system("cls");
             string loginUsername, loginPassword;
             cout << "Enter student username: ";
-            cin >> loginUsername;
+            cin.ignore(); // To ignore the leftover newline character
+            getline(cin, loginUsername); // Use getline to allow spaces in username
             cout << "Enter password: ";
             cin >> loginPassword;
 
@@ -236,6 +261,67 @@ int clearScreen() {
     return 1;
 }
 
+// Function to get a specific field from a CSV record
+string getfield(string record, int field)
+{
+    int comma = 1;
+    string entity;
+    for(int i = 0; i < record.length(); i++)
+    {
+        if(record[i] == ',')
+        {
+            comma = comma + 1;
+        }
+        else if(comma == field)
+        {
+            entity = entity + record[i];
+        }
+    }
+    return entity;
+}
+
+// Function to load users from the file
+int loadUsers() {
+    fstream file;
+    file.open(USERS_FILE, ios::in); // Open in read mode
+
+    if (!file) {
+        // File doesn't exist, no users to load
+        return 0;
+    }
+
+    string line;
+    while (getline(file, line)) { // Read the file line by line
+        if (line.empty()) continue; // Skip empty lines
+        string name = getfield(line, 1);
+        string pass = getfield(line, 2);
+        string role = getfield(line, 3);
+
+        if (userCount < MAX_RECORDS) {
+            usernameA[userCount] = name;
+            passwordsA[userCount] = pass;
+            rolesA[userCount] = role;
+            userCount++;
+        }
+    }
+
+    file.close();
+    return 1;
+}
+
+// Function to save a single user to the file
+int saveUserToFile(string name, string pass, string role) {
+    fstream file;
+    file.open(USERS_FILE, ios::app); // Open in append mode
+    if (!file) {
+        cout << "Error opening users file for writing." << endl;
+        return 0;
+    }
+    file << name << "," << pass << "," << role << endl;
+    file.close();
+    return 1;
+}
+
 int addUser(string name, string pass, string role) {
     if (userCount >= MAX_RECORDS) {
         cout << "Cannot add more users. Maximum capacity reached." << endl;
@@ -267,7 +353,8 @@ int addStudent() {
     bool validName = false;
     while (!validName) {
         cout << "Enter student username: ";
-        cin >> username;
+        cin.ignore(); // To ignore the leftover newline character
+        getline(cin, username); // Use getline to allow spaces in username
         if (containsDigit(username)) {
             cout << "Student name should not contain numbers. Please try again." << endl;
         } else {
@@ -298,6 +385,10 @@ int addStudent() {
         cout << "Failed to add user." << endl;
         return 0;
     }
+    if (!saveUserToFile(username, pass, "STUDENT")) { // Save to file
+        cout << "Failed to save student to file." << endl;
+        return 0;
+    }
 
     cout << "Student added successfully!" << endl;
     clearScreen();
@@ -317,7 +408,7 @@ int addStudentIntoArray(string username, float balance) {
 }
 
 int viewStudentBalances() {
-    cout << "Username\tBalance" << endl;
+    cout << "Username\t\tBalance" << endl;
     for (int i = 0; i < studentCount; i++) {
         cout << student_name[i] << "\t\t" << student_balance[i] << endl;
     }
@@ -332,7 +423,7 @@ int addBook() {
     cout << "Enter Book ID: ";
     string id;
     cin >> id;
-    cin.get();
+    cin.ignore(); // To ignore the leftover newline character
 
     if (findBookIndex(id) != -1) {
         cout << "Book with this ID already exists." << endl;
@@ -379,7 +470,7 @@ int editBook() {
     cout << "Enter Book ID to edit: ";
     string id;
     cin >> id;
-    cin.get();
+    cin.ignore(); // To ignore the leftover newline character
 
     int index = findBookIndex(id);
     if (index == -1) {
@@ -453,7 +544,7 @@ int deleteBook() {
 int viewBooksStatus() {
     cout << "Book ID\tBook Name\tAuthor Name\tStatus" << endl;
     for (int i = 0; i < bookCount; i++) {
-        cout << bookID[i] << "\t" << bookName[i] << "\t" << bookAuthor[i] << "\t" << bookStatus[i] << endl;
+        cout << bookID[i] << "\t" << bookName[i] << "\t\t" << bookAuthor[i] << "\t" << bookStatus[i] << endl;
     }
     return 1;
 }
